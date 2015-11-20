@@ -30,8 +30,8 @@ int main(void)
 	int sockfd,cant,var2,vectorfd[MAX_JUG],x=0,var3,sig=SIGUSR1;
 	struct casilla CASILLA;
 	struct dato jugador[MAX_JUG];
-	struct sockaddr_in servidor; 
-	struct sockaddr_in vector_cliente[MAX_JUG]; 
+	struct sockaddr_in servidor;
+	struct sockaddr_in vector_cliente[MAX_JUG];
 	struct nodo *inicio=NULL;
 	struct nodo *vector_posicion[MAX_JUG];
 	FILE *fp;
@@ -80,7 +80,7 @@ int main(void)
 	    jugador[var2].cantidad=2500;
 	    printf("\nerror al recibir nombres\n");
 	    exit(1);
-	  } 
+	  }
 	  if((recv(vectorfd[var2],&jugador[var2].pid_cliente,MAX_JUG,0))==-1)
 	  {
 	  	printf("\nerror al recibir los pids\n");
@@ -113,7 +113,7 @@ int main(void)
 			}
 		}
 	}
-	
+
 }
 int funcion_mensaje(int array[],int cantidad)
 {

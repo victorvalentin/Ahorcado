@@ -23,3 +23,4 @@ mono
 tigre
 canguro
 ornitorrinco
+hamster

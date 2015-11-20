@@ -71,15 +71,15 @@ int main(int argc,char *argv[])
 	}
 	if((recv(sockfd,&signal,4,0))==-1)
 	{
-	  printf("error al recibir señal\n");
+	  printf("error al recibir seï¿½al\n");
 	  exit(1);
 	}
 	else
 	{
 	  raise(signal);
 	}
-	
-	
+
+
 }
 void funcion_trapeo(int sig)
 {
