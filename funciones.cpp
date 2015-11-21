@@ -23,7 +23,7 @@ int generar_num_linea(int cant_lineas)
 	time_t t;
 
 	/* Intializes random number generator */
-	srand((unsigned) time(&t));
+	srand(time(NULL));
 
 	return (rand() % cant_lineas);
 }
