@@ -1,6 +1,8 @@
 #include "headers.h"
 #define PUERTO "6000"
 #define MAX_JUG 8
+#define true 1
+#define false 0
 
 struct dato{
   char nombre[15];
@@ -22,8 +24,15 @@ void mostrar_jugadores(struct dato jugadores[] ,int cantidad);
 void aceptar_jugadores(int, int, int [], struct sockaddr_in []);
 void recibir_nombres(int [], int, struct dato[]);
 void enviar_cantidad_letras(int [], int, int);
-void abrir_archivo(FILE*, char*);
+void abrir_archivo(FILE**, char*);
 int generar_palabra(FILE*, char*);
+void sendall(int, const char*, const unsigned int);
+void informar_jugada_letra(int [], int, char*, int, char);
+void informar_turno(int, int);
+void informar_letra(int, char);
+void informar_nombre(int, char*);
+void informar_opcion(int, int);
+void informar_jugada_palabra(int [], int, char*, int, char*);
 
 int main(int argc,char *argv[])
 {
@@ -32,7 +41,7 @@ int main(int argc,char *argv[])
 	int fd_listener, fd_jugadores[MAX_JUG];
 	int cant_letras;
 	socklen_t addr_size = sizeof(struct sockaddr);
-	int a=0, b=1, opcion, fin_de_juego, var3;
+	int jugar, opcion;	// opcion 1 = letra 2 = palabra
 	char palabra[20], letra, palabra_completa[20];
 	struct dato jugadores[MAX_JUG];
 	struct sockaddr_in vector_cliente[MAX_JUG];
@@ -68,14 +77,13 @@ int main(int argc,char *argv[])
 
 	mostrar_jugadores(jugadores ,cant_jugadores);
 
-	abrir_archivo(fp, argv[1]);
+	abrir_archivo(&fp, argv[1]);
 	cant_letras = generar_palabra(fp, palabra);
 	enviar_cantidad_letras(fd_jugadores, cant_jugadores, cant_letras);
 
 	generar_lista(&inicio, palabra, cant_letras);
 
-	var3 = 0;
-	int var2;
+	int turno;
 
 	while(1)
 	{
@@ -84,141 +92,73 @@ int main(int argc,char *argv[])
 			break;
 		}
 
-		if((send(fd_jugadores[var3], &a, sizeof(a), 0))==-1)
+		// Una vuelta por cada jugador, luego se reinicia
+		for(turno = 0; turno < cant_jugadores; turno++)
 		{
-			printf("\nerror al enviar a\n");
-			exit(1);
-		}
+			jugar = true;
 
-		else
-		{
-			if((recvfrom(fd_jugadores[var3], &opcion, sizeof(opcion), 0, (struct sockaddr*)&vector_cliente[var3], &addr_size))< 0)
+			informar_turno(fd_jugadores[turno], jugar);
+
+			// Recibe la opcion: Si va a ingresar una letra o una palabra
+			if((recvfrom(fd_jugadores[turno], &opcion, sizeof(opcion), 0, (struct sockaddr*)&vector_cliente[turno], &addr_size))< 0)
 			{
-				perror("\nerror al recibir opcion: ");
+				perror("\nError al recibir opcion: ");
 				exit(1);
 			}
 			else
 			{
-				if(opcion==1)
+				if(opcion == 1)
 				{
 					// Recibe una letra
-					if((recv(fd_jugadores[var3], &letra, sizeof(letra), 0))==-1)
+					if((recv(fd_jugadores[turno], &letra, sizeof(letra), 0))==-1)
 					{
-						printf("error al recibir letra del jugador %s\n", jugadores[var3].nombre);
+						printf("Error al recibir letra del jugador %s\n", jugadores[turno].nombre);
 						exit(1);
 					}
 					else
 					{
 						comparar(&inicio, letra);
 
-						for(var2=0; var2 <= cant_jugadores-1; var2++)
-						{
-							if(var2==var3)
-							{
-								var2++;
-							}
+						// Les informa a los demas jugadores que No es su turno, Envia el nombre del jugador, la opcion que es 1 y la letra que elegio
+						informar_jugada_letra(fd_jugadores, cant_jugadores, jugadores[turno].nombre, turno, letra);
 
-							if((send(fd_jugadores[var2],&b,sizeof(int),0))==-1)
-							{
-								printf("\nerror al enviar b\n");
-								exit(1);
-							}
-							else
-							{
-								if((send(fd_jugadores[var2],jugadores[var3].nombre,15,0))==-1)
-								{
-									printf("error al enviar nombres\n");
-									exit(1);
-								}
-								else
-								{
-									if((send(fd_jugadores[var2],&opcion,4,0))==-1)
-									{
-										printf("error al enviar la opcion a los demas jugadores\n");
-										exit(1);
-									}
-									else
-									{
-										if((send(fd_jugadores[var2],&letra,1,0))==-1)
-										{
-											printf("error al enviar la letra a los demas jugadores\n");
-											exit(1);
-										}
-										else
-										{
-											if(inicio==NULL)
-											break;
-										}
-									}
-								}
-							}
+						if(inicio == NULL)
+						{
+							break;
 						}
 					}
 				}
-				else
+				else if(opcion == 2)
 				{
-					if((recv(fd_jugadores[var3],palabra_completa,20,0))==-1)
+					// Recibe una palabra
+					char* buff_palabra = malloc(20);
+
+					if((recv(fd_jugadores[turno], buff_palabra, 20, 0))==-1)
 					{
-						printf("error al recibir palabra completa\n");
+						printf("Error al recibir palabra del jugador %s\n", jugadores[turno].nombre);
 						exit(1);
 					}
 					else
 					{
-						for(var2=0;var2<=cant_jugadores-1;var2++)
+						strcpy(palabra_completa, buff_palabra);
+						free(buff_palabra);
+
+						// Informa que no es su turno, le dice la opcion elegida = 2, y la palabra
+						informar_jugada_palabra(fd_jugadores, cant_jugadores, jugadores[turno].nombre, turno, palabra_completa);
+
+						if((strcmp(palabra, palabra_completa))==0)
 						{
-							if(var2==var3)
-							{
-								var2++;
-							}
-							if((send(fd_jugadores[var2],&b,sizeof(b),0))==-1)
-							{
-								printf("error al enviar b\n");
-								exit(1);
-							}
-							else
-							{
-								if((send(fd_jugadores[var2],jugadores[var2].nombre,15,0))==-1)
-								{
-									printf("error al enviar nombres\n");
-									exit(1);
-								}
-								else
-								{
-									if((send(fd_jugadores[var2],&opcion,4,0))==-1)
-									{
-										printf("error al enviar la opcion a los demas jugadores\n");
-										exit(1);
-									}
-									else
-									{
-										if((send(fd_jugadores[var2],palabra_completa,20,0))==-1)
-										{
-											printf("error al enviar la palabra completa a los demas jugadores\n");
-											exit(1);
-										}
-										else
-										{
-											if((strcmp(palabra,palabra_completa))==0)
-											{
-												break;
-											}
-											else
-											{
-												fin_de_juego++;
-											}
-										}
-									}
-								}
-							}
+							break;
 						}
 					}
 				}
 			}
 		}
 
-		if(var3==cant_jugadores)
+		if( turno == cant_jugadores)
 		{
-			var3=0;
+			// Se vuelve a empezar la ronda
+			turno = 0;
 		}
 	}
 	return 0;
@@ -427,9 +367,9 @@ void enviar_cantidad_letras(int vectorfd[], int cant_jugadores, int cant_letras)
 	}
 }
 
-void abrir_archivo(FILE* fp, char* path)
+void abrir_archivo(FILE** fp, char* path)
 {
-	if(!(fp = fopen(path, "rb"))) //abro el archivo que contiene las palabras
+	if(!(*fp = fopen(path, "rb"))) //abro el archivo que contiene las palabras
 	{
 		perror("\nerror al abrir archivo: ");
 		exit(1);
@@ -444,4 +384,102 @@ int generar_palabra(FILE* fp, char* palabra)
 	int cant_letras = strlen(palabra); //cuento la cantidad de letras
 
 	return cant_letras;
+}
+
+void informar_turno(int fd_jugadores, int jugar)
+{
+	char* buffer_jugar = malloc(sizeof(int));
+	memcpy(buffer_jugar, &jugar, sizeof(int));
+
+	// Le avisa que si es su turno o no (true/false)
+	sendall(fd_jugadores, buffer_jugar, sizeof(int));
+
+	free (buffer_jugar);
+}
+
+void sendall(int descriptorSocket, const char* buffer, const unsigned int bytesPorEnviar)
+{
+	int retorno;
+	int bytesEnviados = 0;
+
+	while (bytesEnviados < (int)bytesPorEnviar)
+	{
+	   retorno = send(descriptorSocket, (char*)(buffer+bytesEnviados), bytesPorEnviar-bytesEnviados, 0);
+
+	   //Controlo Errores
+	   if(retorno <= 0)
+	   {
+		  printf("Error al enviar Datos (se corto el Paquete Enviado), solo se enviaron %d bytes de los %d bytes totales por enviar\n", bytesEnviados, (int)bytesPorEnviar);
+		  perror("El Error Detectado es: ");
+		  bytesEnviados = retorno;
+		  break;
+	   }
+
+	   //Si no hay problemas, sigo acumulando bytesEnviados
+	   bytesEnviados += retorno;
+	}
+}
+
+void informar_jugada_letra(int vectorfd[], int cant, char* nombre_jugador, int turno , char letra)
+{
+	int i;
+	for(i=0; i < cant; i++)
+	{
+		if(i != turno)
+		{
+			informar_turno(vectorfd[i], false);
+			informar_nombre(vectorfd[i], nombre_jugador);
+			informar_opcion(vectorfd[i], 1);
+			informar_letra(vectorfd[i], letra);
+		}
+	}
+}
+
+void informar_nombre(int fd, char* nombre)
+{
+	char* buff_nombre = malloc(20);
+	strcpy(buff_nombre, nombre);
+
+	sendall(fd, buff_nombre, strlen(nombre));
+}
+
+void informar_opcion(int fd, int opcion)
+{
+	char* buff_opcion = malloc(sizeof(int));
+	memcpy(buff_opcion, &opcion, sizeof(int));
+
+	sendall(fd, buff_opcion, sizeof(int));
+}
+
+void informar_letra(int fd, char letra)
+{
+	char* buff_letra = malloc(sizeof(letra));
+	memcpy(buff_letra, &letra, sizeof(char));
+
+	sendall(fd, buff_letra, sizeof(char));
+}
+
+void informar_palabra(int fd, char* palabra)
+{
+	char* buff_palabra = malloc(20);
+	strcpy(buff_palabra, palabra);
+
+	sendall(fd, buff_palabra, strlen(palabra));
+
+	free(buff_palabra);
+}
+
+void informar_jugada_palabra(int vectorfd[], int cant, char* nombre_jugador, int turno, char* palabra)
+{
+	int i;
+	for(i=0; i < cant; i++)
+	{
+		if(i != turno)
+		{
+			informar_turno(vectorfd[i], false);
+			informar_nombre(vectorfd[i], nombre_jugador);
+			informar_opcion(vectorfd[i], 1);
+			informar_palabra(vectorfd[i], palabra);
+		}
+	}
 }
